@@ -3,6 +3,9 @@ mod game;
 use crate::app::App;
 
 fn main() -> iced::Result {
-    iced::run("Game of Life", App::update, App::view).unwrap();
+    iced::application("Game of Life", App::update, App::view)
+        .subscription(App::subscription)
+        .run()
+        .unwrap();
     Ok(())
 }

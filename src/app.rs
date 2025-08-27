@@ -1,8 +1,10 @@
 use crate::game;
 use array2d::Array2D;
 use iced::{
-    Color, Length, Padding,
-    widget::{Button, Column, Container, Row},
+    Alignment::Center,
+    Color, Length, Padding, Subscription, Task,
+    time::{self, Duration},
+    widget::{Button, Column, Container, Row, Slider, Toggler, column, row, text},
 };
 use rand_distr::{Distribution, Uniform};
 
@@ -12,25 +14,39 @@ pub enum Message {
     ToggleCell(usize, usize),
     Randomize,
     Clear,
+    ToggleAutomatic(bool),
+    SliderChange(f64),
 }
 
 pub struct App {
     grid: Array2D<u8>,
+    is_running: bool,
+    speed: f64,
 }
 
 impl Default for App {
     fn default() -> Self {
-        let row_size: usize = 50;
-        let col_size: usize = 100;
+        let row_size: usize = 100;
+        let col_size: usize = 200;
 
         Self {
             grid: Array2D::filled_with(0u8, row_size, col_size),
+            is_running: false,
+            speed: 1.0,
         }
     }
 }
 
 impl App {
-    pub fn update(&mut self, message: Message) {
+    pub fn subscription(state: &App) -> Subscription<Message> {
+        if state.is_running {
+            time::every(Duration::from_secs_f64(state.speed)).map(|_| Message::Future)
+        } else {
+            Subscription::none()
+        }
+    }
+
+    pub fn update(&mut self, message: Message) -> iced::Task<Message> {
         match message {
             Message::Future => self.grid = game::future_generation(&self.grid),
             Message::Clear => {
@@ -54,7 +70,12 @@ impl App {
                     }
                 }
             }
+            Message::ToggleAutomatic(is_checked) => {
+                self.is_running = is_checked;
+            }
+            Message::SliderChange(value) => self.speed = value,
         }
+        Task::none()
     }
 
     pub fn view(&self) -> iced::Element<Message> {
@@ -89,31 +110,47 @@ impl App {
             grid_column = grid_column.push(iced_row);
         }
 
-        let buttons_column = Column::new().spacing(5).push(
-            Row::new()
-                .spacing(5)
-                .push(Button::new("Future Generation").on_press(Message::Future))
-                .push(Button::new("Clear").on_press(Message::Clear))
-                .push(Button::new("Randomize").on_press(Message::Randomize)),
-        );
+        let speed_slider: Column<'_, Message> = column![
+            row![text(format!("Iteration speed: {:.2} sec", self.speed))]
+                .align_y(Center)
+                .spacing(5),
+            row![
+                Slider::new(0.1..=1.0f64, self.speed, Message::SliderChange)
+                    .step(0.05f64)
+                    .width(175)
+            ]
+            .align_y(Center)
+            .spacing(5),
+        ]
+        .spacing(5)
+        .align_x(Center);
+
+        let button_row: Row<'_, Message> = row![
+            Button::new("Future Generation").on_press(Message::Future),
+            Button::new("Clear").on_press(Message::Clear),
+            Button::new("Randomize").on_press(Message::Randomize),
+            column![
+                row![text("Run continuously")].align_y(Center),
+                row![
+                    Toggler::new(self.is_running)
+                        .label("")
+                        .on_toggle(Message::ToggleAutomatic)
+                ]
+                .align_y(Center)
+            ]
+            .align_x(Center),
+        ]
+        .align_y(Center)
+        .spacing(10);
+
+        let top_bar: Column<'_, Message> = Column::new()
+            .padding(10)
+            .push(row![button_row, speed_slider].spacing(15).align_y(Center));
 
         Column::new()
-            .spacing(20)
-            .push(Container::new(buttons_column).padding(Padding {
-                top: 10.0,
-                left: 10.0,
-                ..Default::default()
-            }))
-            .push(
-                Container::new(grid_column).style(|_| iced::widget::container::Style {
-                    border: iced::Border {
-                        width: 2.0,
-                        color: Color::from_rgba(128.0, 128.0, 128.0, 1.0),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }),
-            )
+            .align_x(Center)
+            .push(Container::new(top_bar).padding(Padding::new(10f32).bottom(0)))
+            .push(Container::new(grid_column).padding(Padding::new(20f32)))
             .into()
     }
 }
