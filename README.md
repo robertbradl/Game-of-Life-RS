@@ -1,3 +1,4 @@
-# Game-of-Life-RS
+# Rust projects
 
-Simple implementation of Conway’s Game of Life in Rust using iced.
+This is a repo for my projects/tasks I gave myself to
+learn Rust. Expect bad code.
